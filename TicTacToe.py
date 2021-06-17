@@ -1,4 +1,4 @@
-# This code learns to play tic-tac-toe either using Q-learning or Sarsa reinforcement learning.
+# This code learns to play tic-tac-toe from scratch, either using Q-learning or Sarsa reinforcement learning.
 
 # Board states are represented as 9 characters tuples (lists are not hashable, and thus
 # cannot serve as keys in dictionaries).
@@ -21,20 +21,27 @@ alpha = 0.8
 gamma = 0.9
 
 
-def full(board):
-    return "partial" if None in board else "full"
-
-
+# Returns an empty board
 def init_board():
     return tuple([None] * 9)
 
 
-# returns a symbol that repeats 3 times at given indices, None otherwise
+# Checks if the board is fully filled
+def full(board):
+    return "partial" if None in board else "full"
+
+
+# Prints the board
+def print_board(board):
+    print('\n'.join([''.join(e if e else "." for e in s) for s in board[:3], board[3:6], board[6:]]))
+
+
+# Returns a symbol that repeats 3 times at given indices, None otherwise
 def same_symbol(board, i, j, k):
     return None if board[i] != board[j] or board[j] != board[k] else board[i]
 
 
-# returns the symbol if either side won, or "full" if the board if full, None otherwise
+# Returns the symbol if either side won, or whether board is full
 def evaluate(board):
     return (same_symbol(board, 0, 1, 2)  # rows
             or same_symbol(board, 3, 4, 5)
@@ -47,24 +54,28 @@ def evaluate(board):
             or full(board))
 
 
-# returns indices of empty fields in a board
+# Returns indices of still empty fields in a board
 def possible_moves(board):
     return [i for i, val in enumerate(board) if not val]
 
 
+# Returns the opposite player symbol to the given one
 def reverse(symbol):
     return "O" if symbol == "X" else "X"
 
 
+# Learns, i.e. updates the Q table based on the reward from an action
 def update_Q(Q, board, action, reward, best_value):
     current = Q.get((board, action), random.randint(-10, 11))
     Q[board, action] = current + alpha * (reward + gamma * best_value - current)
 
 
+# Puts the symbol in the field with action index on the board
 def move(board, action, symbol):
     return tuple(val if i != action else symbol for i, val in enumerate(board))
 
 
+# Returns the best action or, with epsilon probability, a random action
 def epsilon_greedy(Q, board, symbol):
     actions = possible_moves(board)
     if not actions:
@@ -77,10 +88,7 @@ def epsilon_greedy(Q, board, symbol):
     return random.choice(actions) if random.random() < epsilon else best, action_value(best)
 
 
-def print_board(board):
-    print('\n'.join(["---"] + [''.join(e if e else "." for e in s) for s in board[:3], board[3:6], board[6:]]))
-
-
+# Plays a single learning game
 def episode(Q, mode):
     symbol = "X"
     board = init_board()
@@ -96,6 +104,7 @@ def episode(Q, mode):
         board, action = next_board, next_action
 
 
+# Learns by playing multiple games and returns the learnt Q table
 def learn(mode):
     Q = {}
     bucket = 1000
@@ -108,20 +117,46 @@ def learn(mode):
     return Q
 
 
+# Prints an example game
 def example_play(Q):
     symbol = "X"
     board = init_board()
     while evaluate(board) is "partial":
         board = move(board, epsilon_greedy(Q, board, symbol)[0], symbol)
         symbol = reverse(symbol)
+        print("")
         print_board(board)
 
 
-learning_mode = "q_learning"  # or "sarsa", anything else is treated as Q-learning in fact
+def play(Q, symbol):
+    print("Let's play. I'll play the X symbol, and you'll play the O")
+    print("When providing your move, please enter the index of the field according to:")
+    print("0 1 2")
+    print("3 4 5")
+    print("6 7 8")
+    board = init_board()
+    while evaluate(board) is "partial":
+        action = epsilon_greedy(Q, board, symbol)[0] if symbol == "X" else int(input("Please provide your move index: "))
+        board = move(board, action, symbol)
+        symbol = reverse(symbol)
+        print("")
+        print_board(board)
+    result = evaluate(board)
+    if result == "X":
+        print("I won!")
+    elif result == "O":
+        print("Congratulations, you won!")
+    else:
+        print("Oh well, it's a draw")
+
+
 print("First, I'm learning from scratch")
-Q = learn(learning_mode)
+Q = learn("q_learning") # or "sarsa", anything else is treated as Q-learning in fact
 print("-------------")
 print("Now I'm showing an example game")
 example_play(Q)
-
-
+print("And now, let's play")
+again = "y"
+while again is not "n":
+    play(Q, random.choice(["X", "O"]))
+    again = str(input("Again? y/n "))
