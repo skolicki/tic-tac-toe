@@ -105,10 +105,9 @@ def episode(Q, mode):
 
 
 # Learns by playing multiple games and returns the learnt Q table
-def learn(mode):
+def learn(mode, max_iteration):
     Q = {}
     bucket = 1000
-    max_iteration = 100 * bucket
     for iteration in xrange(max_iteration):
         episode(Q, mode)
         if not iteration % bucket:
@@ -151,7 +150,7 @@ def play(Q, symbol):
 
 
 print("First, I'm learning from scratch")
-Q = learn("q_learning") # or "sarsa", anything else is treated as Q-learning in fact
+Q = learn("q_learning", 1000000) # or "sarsa", anything else is treated as Q-learning in fact
 print("-------------")
 print("Now I'm showing an example game")
 example_play(Q)
