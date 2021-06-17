@@ -11,10 +11,10 @@
 
 import random
 
-REWARDS = {"X"  : 100,
-           "O"  : -100,
-           True : -3,  # draw
-           False: 0}
+REWARDS = {"X": 100,
+           "O": -100,
+           "full": -3,  # draw
+           "partial": 0}
 
 epsilon = 0.1
 alpha = 0.8
@@ -23,12 +23,12 @@ gamma = 0.9
 Q = {}
 
 def full(state):
-  return not None in state
+  return "full" if not None in state else "partial"
 
 def init():
   return tuple([None] * 9)
 
-# returns a symbol that repeats 3 times at given indices
+# returns a symbol that repeats 3 times at given indices, None otherwise
 def same_symbol(state, i ,j, k):
   return None if state[i] != state[j] or state[j] != state[k] else state[i]
 
@@ -44,6 +44,7 @@ def evaluate(state):
     or same_symbol(state, 2, 4, 6)
     or full(state))
 
+# returns indices of empty fields in a state
 def possible_moves(state):
   return [i for i, val in enumerate(state) if not val]
 
@@ -73,9 +74,9 @@ def episode(mode, debug = False):
     next_state = move(state, action, symbol)
     symbol = reverse(symbol)
     status = evaluate(next_state)  # can only be prev symbol
-    next_action, best_value = epsilon_greedy(next_state, symbol) if not status else (None, 0)
+    next_action, best_value = epsilon_greedy(next_state, symbol) if status == "partial" else (None, 0)
     update_value = Q.get((next_state, next_action), 0) if mode == "sarsa" else best_value
-    reward = (REWARDS[symbol] / 20) if not status else REWARDS[status]   # assign opposite small neg reward
+    reward = (REWARDS[symbol] / 20) if status == "partial" else REWARDS[status]   # assign opposite small neg reward
     update_Q(state, action, reward, update_value)
     state, action = next_state, next_action
     if debug:
