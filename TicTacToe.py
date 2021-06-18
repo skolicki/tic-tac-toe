@@ -33,7 +33,7 @@ def full(board):
 
 # Prints the board
 def print_board(board):
-    print('\n'.join([''.join(e if e else "." for e in s) for s in board[:3], board[3:6], board[6:]]))
+    print('\n'.join([''.join(e if e else "." for e in s) for s in (board[:3], board[3:6], board[6:])]))
 
 
 # Returns a symbol that repeats 3 times at given indices, None otherwise
@@ -108,7 +108,7 @@ def episode(Q, mode):
 def learn(mode, max_iteration):
     Q = {}
     bucket = 1000
-    for iteration in xrange(max_iteration):
+    for iteration in range(max_iteration):
         episode(Q, mode)
         if not iteration % bucket:
             print("iteration: " + str(iteration) + " out of " + str(max_iteration))
@@ -120,7 +120,7 @@ def learn(mode, max_iteration):
 def example_play(Q):
     symbol = "X"
     board = init_board()
-    while evaluate(board) is "partial":
+    while evaluate(board) == "partial":
         board = move(board, epsilon_greedy(Q, board, symbol)[0], symbol)
         symbol = reverse(symbol)
         print("")
@@ -134,7 +134,7 @@ def play(Q, symbol):
     print("3 4 5")
     print("6 7 8")
     board = init_board()
-    while evaluate(board) is "partial":
+    while evaluate(board) == "partial":
         action = epsilon_greedy(Q, board, symbol)[0] if symbol == "X" else int(input("Please provide your move index: "))
         board = move(board, action, symbol)
         symbol = reverse(symbol)
@@ -150,12 +150,12 @@ def play(Q, symbol):
 
 
 print("First, I'm learning from scratch")
-Q = learn("q_learning", 1000000) # or "sarsa", anything else is treated as Q-learning in fact
+Q = learn("sarsa", 100000) # either "sarsa" or anything else is treated as Q-learning
 print("-------------")
 print("Now I'm showing an example game")
 example_play(Q)
 print("And now, let's play")
 again = "y"
-while again is not "n":
+while again == "y":
     play(Q, random.choice(["X", "O"]))
     again = str(input("Again? y/n "))
