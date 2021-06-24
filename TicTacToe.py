@@ -66,7 +66,7 @@ def reverse(symbol):
 
 # Learns, i.e. updates the Q table based on the reward from an action
 def update_Q(Q, board, action, reward, best_value):
-    current = Q.get((board, action), random.randint(-10, 11))
+    current = Q.get((board, action), random.randint(-1, 2))
     Q[board, action] = current + alpha * (reward + gamma * best_value - current)
 
 
@@ -76,7 +76,7 @@ def move(board, action, symbol):
 
 
 # Returns the best action or, with epsilon probability, a random action
-def epsilon_greedy(Q, board, symbol):
+def epsilon_greedy(Q, board, symbol, epsilon):
     actions = possible_moves(board)
     if not actions:
         return None, 0
@@ -92,12 +92,12 @@ def epsilon_greedy(Q, board, symbol):
 def episode(Q, mode):
     symbol = "X"
     board = init_board()
-    action, _ = epsilon_greedy(Q, board, symbol)
+    action, _ = epsilon_greedy(Q, board, symbol, epsilon)
     while action is not None:
         next_board = move(board, action, symbol)
         symbol = reverse(symbol)
         status = evaluate(next_board)  # can only be prev symbol
-        next_action, best_value = epsilon_greedy(Q, next_board, symbol) if status == "partial" else (None, 0)
+        next_action, best_value = epsilon_greedy(Q, next_board, symbol, epsilon) if status == "partial" else (None, 0)
         update_value = Q.get((next_board, next_action), 0) if mode == "sarsa" else best_value
         reward = (REWARDS[symbol] / 20) if status == "partial" else REWARDS[status]  # assign opposite small neg reward
         update_Q(Q, board, action, reward, update_value)
@@ -121,7 +121,7 @@ def example_play(Q):
     symbol = "X"
     board = init_board()
     while evaluate(board) == "partial":
-        board = move(board, epsilon_greedy(Q, board, symbol)[0], symbol)
+        board = move(board, epsilon_greedy(Q, board, symbol, 0)[0], symbol)
         symbol = reverse(symbol)
         print("")
         print_board(board)
@@ -135,7 +135,7 @@ def play(Q, symbol):
     print("6 7 8")
     board = init_board()
     while evaluate(board) == "partial":
-        action = epsilon_greedy(Q, board, symbol)[0] if symbol == "X" else int(input("Please provide your move index: "))
+        action = epsilon_greedy(Q, board, symbol, 0)[0] if symbol == "X" else int(input("Please provide your move index: "))
         board = move(board, action, symbol)
         symbol = reverse(symbol)
         print("")
@@ -150,7 +150,7 @@ def play(Q, symbol):
 
 
 print("First, I'm learning from scratch")
-Q = learn("sarsa", 100000) # either "sarsa" or anything else is treated as Q-learning
+Q = learn("q_learning", 1000000) # either "sarsa" or anything else is treated as Q-learning
 print("-------------")
 print("Now I'm showing an example game")
 example_play(Q)
