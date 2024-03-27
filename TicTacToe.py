@@ -11,19 +11,34 @@
 
 import random
 
-REWARDS = {"X": 100,
-           "O": -100,
-           "full": -3,  # draw
-           "partial": 0}
+REWARDS = {"won": 100,
+           "lost": -100,
+           "full": -10,  # draw
+           "partial": -5}  # better win faster
 
 epsilon = 0.1
 alpha = 0.8
 gamma = 0.9
 
 
+# Returns the opposite player symbol to the given one
+def reverse(symbol):
+    return "O" if symbol == "X" else "X" if symbol == "O" else None
+
+
+# Returns a random player symbol
+def random_symbol():
+    return random.choice(("X", "O"))
+
+
 # Returns an empty board
 def init_board():
     return tuple([None] * 9)
+
+
+# Reverses symbols in the board (needed because we only learn from X as a starting symbol
+def reverse_board(board):
+    return tuple([reverse(s) for s in board])
 
 
 # Checks if the board is fully filled
@@ -41,17 +56,18 @@ def same_symbol(board, i, j, k):
     return None if board[i] != board[j] or board[j] != board[k] else board[i]
 
 
-# Returns the symbol if either side won, or whether board is full
-def evaluate(board):
-    return (same_symbol(board, 0, 1, 2)  # rows
-            or same_symbol(board, 3, 4, 5)
-            or same_symbol(board, 6, 7, 8)
-            or same_symbol(board, 0, 3, 6)  # columns
-            or same_symbol(board, 1, 4, 7)
-            or same_symbol(board, 2, 5, 8)
-            or same_symbol(board, 0, 4, 8)  # diagonals
-            or same_symbol(board, 2, 4, 6)
-            or full(board))
+# Returns the "won" if the provided symbol won, "lost" if opposite symbol won, or whether board is full or partially
+# filled
+def evaluate(board, symbol):
+    line = same_symbol(board, 0, 1, 2) \
+           or same_symbol(board, 3, 4, 5) \
+           or same_symbol(board, 6, 7, 8) \
+           or same_symbol(board, 0, 3, 6) \
+           or same_symbol(board, 1, 4, 7) \
+           or same_symbol(board, 2, 5, 8) \
+           or same_symbol(board, 0, 4, 8) \
+           or same_symbol(board, 2, 4, 6)
+    return "won" if line == symbol else "lost" if line == reverse(symbol) else full(board)
 
 
 # Returns indices of still empty fields in a board
@@ -59,15 +75,16 @@ def possible_moves(board):
     return [i for i, val in enumerate(board) if not val]
 
 
-# Returns the opposite player symbol to the given one
-def reverse(symbol):
-    return "O" if symbol == "X" else "X"
-
-
 # Learns, i.e. updates the Q table based on the reward from an action
 def update_Q(Q, board, action, reward, best_value):
-    current = Q.get((board, action), random.randint(-1, 2))
+    current = Q.get((board, action), random.randint(-10, 11))
     Q[board, action] = current + alpha * (reward + gamma * best_value - current)
+
+
+def print_Q(Q, board):
+    print([Q.get((board, a), ".") for a in (0, 1, 2)])
+    print([Q.get((board, a), ".") for a in (3, 4, 5)])
+    print([Q.get((board, a), ".") for a in (6, 7, 8)])
 
 
 # Puts the symbol in the field with action index on the board
@@ -76,13 +93,13 @@ def move(board, action, symbol):
 
 
 # Returns the best action or, with epsilon probability, a random action
-def epsilon_greedy(Q, board, symbol, epsilon):
+def epsilon_greedy(Q, board, epsilon):
     actions = possible_moves(board)
     if not actions:
         return None, 0
 
     def action_value(action):
-        return Q.get((board, action), 0) if symbol == "X" else -Q.get((board, action), 0)
+        return Q.get((board, action), 0)
 
     best = max(actions, key=action_value)
     return random.choice(actions) if random.random() < epsilon else best, action_value(best)
@@ -90,18 +107,16 @@ def epsilon_greedy(Q, board, symbol, epsilon):
 
 # Plays a single learning game
 def episode(Q, mode):
-    symbol = "X"
+    symbol = "X"  # learn from X as a starting symbol
     board = init_board()
-    action, _ = epsilon_greedy(Q, board, symbol, epsilon)
+    action, _ = epsilon_greedy(Q, board, epsilon)
     while action is not None:
         next_board = move(board, action, symbol)
-        symbol = reverse(symbol)
-        status = evaluate(next_board)  # can only be prev symbol
-        next_action, best_value = epsilon_greedy(Q, next_board, symbol, epsilon) if status == "partial" else (None, 0)
+        status = evaluate(next_board, symbol)
+        next_action, best_value = epsilon_greedy(Q, next_board, epsilon) if status == "partial" else (None, 0)
         update_value = Q.get((next_board, next_action), 0) if mode == "sarsa" else best_value
-        reward = (REWARDS[symbol] / 20) if status == "partial" else REWARDS[status]  # assign opposite small neg reward
-        update_Q(Q, board, action, reward, update_value)
-        board, action = next_board, next_action
+        update_Q(Q, board, action, REWARDS[status], update_value)
+        board, action, symbol = next_board, next_action, reverse(symbol)
 
 
 # Learns by playing multiple games and returns the learnt Q table
@@ -120,11 +135,12 @@ def learn(mode, max_iteration):
 def example_play(Q):
     symbol = "X"
     board = init_board()
-    while evaluate(board) == "partial":
-        board = move(board, epsilon_greedy(Q, board, symbol, 0)[0], symbol)
+    while evaluate(board, symbol) == "partial":
+        board = move(board, epsilon_greedy(Q, board, 0)[0], symbol)
         symbol = reverse(symbol)
         print("")
         print_board(board)
+        print_Q(Q, board)
 
 
 def play(Q, symbol):
@@ -134,23 +150,29 @@ def play(Q, symbol):
     print("3 4 5")
     print("6 7 8")
     board = init_board()
-    while evaluate(board) == "partial":
-        action = epsilon_greedy(Q, board, symbol, 0)[0] if symbol == "X" else int(input("Please provide your move index: "))
+
+    def prep_board(board):
+        return board if symbol == "X" else reverse_board(board)
+
+    while evaluate(board, symbol) == "partial":
+        action = epsilon_greedy(Q, prep_board(board), 0)[0] if symbol == "X" else int(input("Please provide your move index: "))
         board = move(board, action, symbol)
         symbol = reverse(symbol)
         print("")
         print_board(board)
-    result = evaluate(board)
-    if result == "X":
+        print_Q(Q, board)
+
+    result = evaluate(board, "X")
+    if result == "won":
         print("I won!")
-    elif result == "O":
+    elif result == "lost":
         print("Congratulations, you won!")
     else:
         print("Oh well, it's a draw")
 
 
 print("First, I'm learning from scratch")
-Q = learn("q_learning", 1000000) # either "sarsa" or anything else is treated as Q-learning
+Q = learn("q_learning", 100000)  # either "sarsa" or anything else is treated as Q-learning
 print("-------------")
 print("Now I'm showing an example game")
 example_play(Q)
